@@ -40,6 +40,16 @@ manual_seed(0)
 # architecture of MLP trained from scratch can be different from original
 # eg, uncomment to get a 2-hidden layer MLP (original has just 1 hidden layer)
 class CustomLlamaMLP(nn.Module):
+    """
+    Custom MLP module for Llama-style architecture with SwiGLU activation.
+
+    This implementation allows for flexible architecture changes when training
+    replacement MLPs for model distillation and analysis.
+
+    Args:
+        config: Model configuration containing embedding dimensions
+    """
+
     def __init__(self, config):
         super().__init__()
         self.config = config
@@ -53,32 +63,93 @@ class CustomLlamaMLP(nn.Module):
         self.act_fn = nn.SiLU()
 
     def forward(self, x):
-        down_proj = self.down_proj1(self.act_fn(self.gate_proj1(x)) * self.up_proj1(x))
+        """
+        Forward pass implementing SwiGLU activation function.
 
+        Args:
+            x: Input tensor of shape [batch_size, seq_len, hidden_size]
+
+        Returns:
+            torch.Tensor: Output tensor after MLP transformation
+        """
+        down_proj = self.down_proj1(self.act_fn(self.gate_proj1(x)) * self.up_proj1(x))
         return down_proj
 
 
 def hook_out(m, inp, op, feats, name):
+    """
+    Forward hook to capture output activations from model layers.
+
+    Args:
+        m: Module being hooked
+        inp: Input to the module
+        op: Output from the module
+        feats: Dictionary to store activations
+        name: Key to store the activations under
+    """
     feats[name].append(op.detach().cpu())
 
 
 def hook_in(m, inp, op, feats, name):
+    """
+    Forward hook to capture input activations to model layers.
+
+    Args:
+        m: Module being hooked
+        inp: Input to the module (tuple)
+        op: Output from the module
+        feats: Dictionary to store activations
+        name: Key to store the activations under
+    """
     feats[name].append(inp[0].detach().cpu())
 
 
 def mlp_layers(base_model_gate, base_model_up, ft_model_gate, ft_model_up, dataloader, i, j):
+    """
+    Compare gate and up projections between separate model components.
 
+    Tests whether separately trained gate and up projection models have
+    consistent permutation patterns, which would indicate functionally
+    corresponding neurons.
+
+    Args:
+        base_model_gate: First model with gate projection weights
+        base_model_up: First model with up projection weights
+        ft_model_gate: Second model with gate projection weights
+        ft_model_up: Second model with up projection weights
+        dataloader: DataLoader providing input data for activation collection
+        i: Layer index in the first model
+        j: Layer index in the second model
+
+    Returns:
+        float: Pearson correlation p-value between gate and up projection permutations
+    """
     gate_match = mlp_matching(base_model_gate, ft_model_gate, dataloader, i, j)
     up_match = mlp_matching(base_model_up, ft_model_up, dataloader, i, j)
 
     print(gate_match, up_match, i, j)
 
     cor, pvalue = scipy.stats.pearsonr(gate_match.tolist(), up_match.tolist())
-
     return pvalue
 
 
 def mlp_matching(base_model, ft_model, dataloader, i, j):
+    """
+    Match neurons between models by comparing activations.
+
+    Collects activations from the feed-forward layer for both models
+    and computes a permutation that would align corresponding neurons.
+
+    Args:
+        base_model: Base model to compare
+        ft_model: Target model to compare against the base model
+        dataloader: DataLoader providing input data for activation collection
+        i: Layer index in the base model
+        j: Layer index in the target model
+
+    Returns:
+        torch.Tensor: Permutation indices that match neurons between models
+    """
     feats = defaultdict(list)
 
     base_hook = lambda *args: hook_out(*args, feats, "base")
@@ -103,12 +174,29 @@ def mlp_matching(base_model, ft_model, dataloader, i, j):
     ft_handle.remove()
 
     perm = match_wmats(base_mat, ft_mat)
-
     return perm
 
 
 def run(i):
+    """
+    Run the generalized MATCH algorithm to compare models with distilled components.
 
+    This function:
+    1. Loads two different GPT-2 models
+    2. Trains custom MLPs to replicate the behavior of the original model MLPs
+    3. Optionally applies random rotations to test invariance to representation changes
+    4. Creates separate models for gate and up projections
+    5. Compares the models using the MATCH algorithm
+
+    The process demonstrates that functionally equivalent components can be identified
+    even after representation changes, by examining activation patterns.
+
+    Args:
+        i: Layer index to focus on for the analysis
+
+    Returns:
+        None: Prints p-value results from the neuron matching
+    """
     train_losses = []
 
     model_id_2 = "manupande21/GPT2_PMC"
@@ -128,6 +216,7 @@ def run(i):
     T = 10000  # gradient steps
     width_fac = 1.0  # easier to get loss down for wider MLPs when retraining
 
+    # Train the first custom MLP
     mlp = CustomLlamaMLP(config).bfloat16()
 
     mlp.to("cuda")
@@ -137,15 +226,17 @@ def run(i):
     optimizer = torch.optim.Adam(mlp.parameters(), lr=0.001)
     print(f"Training MLP {model_id_1}")
 
+    # Random rotation matrix to test invariance to representation changes
     A = torch.randn(size=(EMB_SIZE, EMB_SIZE), device="cuda").bfloat16() / np.sqrt(
         EMB_SIZE
     )  # rotate outputs (just for kicks / sanity check)
 
+    # Distillation training loop for first model
     for t in range(T):
         X_batch = torch.randn(size=(bsz, EMB_SIZE), dtype=torch.bfloat16, device="cuda")
         with torch.no_grad():
             Y_batch = model.transformer.h[i].mlp(X_batch)
-            Y_batch = Y_batch @ A.T
+            Y_batch = Y_batch @ A.T  # Apply rotation to outputs
 
         Y_h = mlp(X_batch)
 
@@ -159,6 +250,7 @@ def run(i):
             print(f"train loss: {loss.item()}")
             train_losses.append(loss.item())
 
+    # Create separate models for gate and up projections
     config = AutoConfig.from_pretrained(model_id_1)
     config.intermediate_size = int(width_fac * MLP_SIZE)
 
@@ -177,7 +269,6 @@ def run(i):
     model_retrained_1_up.load_state_dict(weights_1_up)
 
     # Retraining / distilling second model
-
     model = AutoModelForCausalLM.from_pretrained(model_id_2, torch_dtype=torch.bfloat16)
 
     config = AutoConfig.from_pretrained(model_id_2)
@@ -191,15 +282,17 @@ def run(i):
 
     print(f"Training MLP {model_id_2}")
 
+    # Different random rotation matrix for second model
     A = torch.randn(size=(EMB_SIZE_2, EMB_SIZE_2), device="cuda").bfloat16() / np.sqrt(
         EMB_SIZE_2
     )  # rotate outputs (just for kicks / sanity check)
 
+    # Distillation training loop for second model
     for t in range(T):
         X_batch = torch.randn(size=(bsz, EMB_SIZE_2), dtype=torch.bfloat16, device="cuda")
         with torch.no_grad():
             Y_batch = model.transformer.h[i].mlp(X_batch)
-            Y_batch = Y_batch @ A.T
+            Y_batch = Y_batch @ A.T  # Apply rotation to outputs
 
         Y_h = mlp(X_batch)
 
@@ -213,6 +306,7 @@ def run(i):
             print(f"train loss: {loss.item()}")
             train_losses.append(loss.item())
 
+    # Create separate models for gate and up projections
     config = AutoConfig.from_pretrained(model_id_2)
     config.intermediate_size = int(width_fac * MLP_SIZE_2)
 
@@ -230,6 +324,7 @@ def run(i):
     model_retrained_2_gate.load_state_dict(weights_2_gate)
     model_retrained_2_up.load_state_dict(weights_2_up)
 
+    # Run MATCH algorithm to compare the models
     print(
         mlp_layers(
             model_retrained_1_gate,

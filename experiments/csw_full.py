@@ -20,7 +20,21 @@ warnings.filterwarnings("ignore")
 
 
 def csw_sp_pair(base_model, ft_model, layer_name_base, layer_name_ft):
+    """
+    Calculate Cosine Similarity of Weights between two specific layers.
 
+    Uses linear assignment to find optimal matching between neurons and
+    calculates Pearson correlation to quantify similarity.
+
+    Args:
+        base_model: First model to compare
+        ft_model: Second model to compare
+        layer_name_base: Name of the layer in the first model's state dict
+        layer_name_ft: Name of the layer in the second model's state dict
+
+    Returns:
+        float: p-value indicating the statistical similarity of weight matrices
+    """
     base_mat = base_model.state_dict()[layer_name_base]
     ft_mat = ft_model.state_dict()[layer_name_ft]
 
@@ -33,6 +47,20 @@ def csw_sp_pair(base_model, ft_model, layer_name_base, layer_name_ft):
 
 
 def csw_models(base_model, ft_model):
+    """
+    Perform comprehensive pairwise comparisons between all compatible layers of two models.
+
+    Tests all possible layer pairings between models that have compatible shapes,
+    useful for exploring model structure similarities without assuming corresponding positions.
+
+    Args:
+        base_model: First model to compare
+        ft_model: Second model to compare
+
+    Returns:
+        float: Aggregate p-value from Fisher's method combining all layer comparisons,
+               or 999 if no compatible layers were found
+    """
     base_model.to("cpu")
     ft_model.to("cpu")
 

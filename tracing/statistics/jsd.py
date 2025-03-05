@@ -1,3 +1,11 @@
+"""
+Implementation of Jensen-Shannon Divergence (JSD) for comparing language model outputs.
+
+This module provides functions to compute the Jensen-Shannon Divergence between
+probability distributions output by two language models, measuring their similarity
+in output space rather than parameter space.
+"""
+
 import torch
 import torch.nn.functional as F
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -9,14 +17,56 @@ from tracing.utils.evaluate import (
 
 
 def statistic(base_model, ft_model, dataloader, device="cuda"):
+    """
+    Compute Jensen-Shannon Divergence between outputs of two language models.
+
+    Args:
+        base_model: Base model to compare
+        ft_model: Fine-tuned or target model to compare against the base model
+        dataloader: DataLoader providing input data for model evaluation
+        device: Device to run the computation on (default: "cuda")
+
+    Returns:
+        float: Sum of Jensen-Shannon Divergence values across all batches
+    """
     return compute_jsd(base_model, ft_model, dataloader, device)
 
 
 def statistic_stable(base_model, ft_model, dataloader, device="cuda"):
+    """
+    Compute numerically stable Jensen-Shannon Divergence between outputs of two models.
+
+    This version handles potential numerical issues better than the standard version.
+
+    Args:
+        base_model: Base model to compare
+        ft_model: Fine-tuned or target model to compare against the base model
+        dataloader: DataLoader providing input data for model evaluation
+        device: Device to run the computation on (default: "cuda")
+
+    Returns:
+        float: Sum of Jensen-Shannon Divergence values across all batches
+    """
     return compute_jsd_stable(base_model, ft_model, dataloader, device)
 
 
 def compute_jsd(base_model, ft_model, dataloader, device="cuda"):
+    """
+    Compute Jensen-Shannon Divergence between two models using softmax outputs.
+
+    Processes each batch in the dataloader and computes JSD between the models'
+    probability distributions over vocabulary tokens. Handles potential vocabulary
+    size differences by truncating to a common size (32000 tokens).
+
+    Args:
+        base_model: Base model to compare
+        ft_model: Fine-tuned or target model to compare against the base model
+        dataloader: DataLoader providing input data for model evaluation
+        device: Device to run the computation on (default: "cuda")
+
+    Returns:
+        float: Sum of Jensen-Shannon Divergence values across all batches
+    """
     jsds = []
 
     base_model.to(device)
@@ -50,78 +100,33 @@ def compute_jsd(base_model, ft_model, dataloader, device="cuda"):
             softmax_ft = softmax_ft[:, :32000]
 
             m = 0.5 * (softmax_base + softmax_ft)
-            # print(m)
-            # print("----")
-            # print(softmax_base)
-            # print("-------")
-            # for x in m:
-            #     if(torch.sum(x) == 0): print(x)
-            # print("--")
-            # for x in m.log().flatten():
-            #     if(x != x): print(x)
-            # print(m.log())
-            # print("-------------")
-            # print(torch.log(softmax_base))
-            # print("asdf")
-            # for x in torch.log(softmax_base).flatten():
-            #     if(x != x): print(x)
-            # print("****")
-            # y = torch.log(softmax_base) - m.log()
-            # print(y)
-            # print("----")
-            # counter = 0
-            # for i in range(len(y)):
-            #     for j in range(len(y[i])):
-            #         if(y[i][j] != y[i][j]):
-            #             y[i][j] = 0
-            #             counter += 1
-            # print(counter)
-            # print("----")
-            # z = softmax_base * y
-            # counter = 0
-            # sum = 0
-            # for i in range(len(z)):
-            #     for j in range(len(z[i])):
-            #         if(z[i][j] == z[i][j]):
-            #             sum += z[i][j]
-            #             counter += 1
-            # print(sum, counter)
-            # for i in range(len(z)):
-            #     for j in range(len(z[i])):
-            #         if(z[i][j] != z[i][j]):
-            #             z[i][j] = sum / counter
-
-            # z = torch.flatten(z)
-            # print(z)
-            # print("****")
-            # sum = 0
-            # counter = 0
-            # for x in z:
-            #     if x == x:
-            #         sum += x
-            #         counter += 1
-            # cleanz = [x for x in z if str(x) != 'nan']
-            # print(torch.mean(cleanz))
-            # print(sum, counter)
-            # print(sum / counter)
-            # print("blah")
-            # print("-------------")
-            # print(F.kl_div(m.log(), softmax_base))
-            # print(F.kl_div(m.log(), softmax_ft))
             jsd = 0.5 * (F.kl_div(m.log(), softmax_base) + F.kl_div(m.log(), softmax_ft))
-
-            # print(jsd)
 
             jsds.append(jsd.item())
 
     base_model.to("cpu")
     ft_model.to("cpu")
-    # print(jsds)
-    # print(sum(jsds))
     return sum(jsds)
 
 
 def compute_jsd_stable(base_model, ft_model, dataloader, device="cuda"):
+    """
+    Compute numerically stable Jensen-Shannon Divergence between two models.
+
+    A more robust implementation that:
+    1. Handles vocabulary size mismatches by truncating to the minimum size
+    2. Uses log-space calculations to avoid numerical underflow
+    3. Computes JSD directly from log probabilities for better stability
+
+    Args:
+        base_model: Base model to compare
+        ft_model: Fine-tuned or target model to compare against the base model
+        dataloader: DataLoader providing input data for model evaluation
+        device: Device to run the computation on (default: "cuda")
+
+    Returns:
+        float: Sum of Jensen-Shannon Divergence values across all batches
+    """
     jsds = []
 
     base_model.to(device)

@@ -9,12 +9,28 @@ from transformers import AutoModelForCausalLM
 
 
 class WeightInfo(NamedTuple):
+    """
+    A named tuple containing metadata about a weight matrix.
+
+    Attributes:
+        model_name: Name or identifier of the model
+        param_name: Name of the parameter in the model's state dict
+        dimensions: Tuple containing the shape of the weight matrix (d1, d2)
+    """
+
     model_name: str
     param_name: str
     dimensions: Tuple[int, int]
 
 
 class CSWSearch:
+    """
+    CSWSearch (Cosine Similarity of Weights Search) using FAISS for efficient similarity search.
+
+    This class enables fast indexing and retrieval of similar weight matrices across models,
+    organizing weight matrices by their dimensions to ensure comparable searches.
+    """
+
     def __init__(self):
         # Keep track of what each index position corresponds to
         self.metadata: Dict[Tuple[int, int], List[WeightInfo]] = {}
@@ -28,7 +44,17 @@ class CSWSearch:
     def add_weight_matrix(
         self, model_name: str, param_name: str, weight_matrix: np.ndarray
     ) -> None:
-        """Add a weight matrix while preserving dimensional information"""
+        """
+        Add a weight matrix to the appropriate index based on its dimensions.
+
+        Args:
+            model_name: Name or identifier of the model
+            param_name: Name of the parameter in the model's state dict
+            weight_matrix: The weight matrix tensor to index
+
+        Returns:
+            None
+        """
         print(f"Adding {model_name} {param_name}")
         d1, d2 = weight_matrix.shape
         dim_key = (d1, d2)
@@ -57,7 +83,23 @@ class CSWSearch:
     def find_similar_weights(
         self, model_name: str, weight_matrix: np.ndarray, k: int = 5
     ) -> List[Tuple[WeightInfo, float]]:
-        """Find similar weight matrices, but only among those with matching dimensions"""
+        """
+        Find similar weight matrices with matching dimensions.
+
+        Searches for weight matrices most similar to the provided one,
+        but only among those with the same dimensions.
+
+        Args:
+            model_name: Name or identifier of the model (used to exclude self-matches)
+            weight_matrix: The weight matrix tensor to search for
+            k: Number of similar matrices to return (default: 5)
+
+        Returns:
+            List of tuples containing (WeightInfo, similarity_score)
+
+        Raises:
+            ValueError: If no weight matrices with matching dimensions are found
+        """
         d1, d2 = weight_matrix.shape
         dim_key = (d1, d2)
 
@@ -84,6 +126,15 @@ class CSWSearch:
         return results[:k]
 
     def _load_index(self, dim_key: Tuple[int, int]) -> faiss.Index:
+        """
+        Load or create the FAISS index for a specific dimension.
+
+        Args:
+            dim_key: Tuple of dimensions (d1, d2)
+
+        Returns:
+            faiss.Index: The loaded or newly created index
+        """
         if self.current_index and self.current_index[0] == dim_key:
             return self.current_index[1]
 
@@ -104,12 +155,29 @@ class CSWSearch:
         return index
 
     def _save_index(self, dim_key: Tuple[int, int], index: faiss.Index):
-        """Save the index for the given dimensions"""
+        """
+        Save the index for the given dimensions to disk.
+
+        Args:
+            dim_key: Tuple of dimensions (d1, d2)
+            index: The FAISS index to save
+
+        Returns:
+            None
+        """
         index_path = os.path.join(self.index_dir, self.index_files[dim_key])
         faiss.write_index(index, index_path)
 
     def save(self, directory: str):
-        """Save the metadata and index_files to disk"""
+        """
+        Save the entire search system (metadata and indexes) to disk.
+
+        Args:
+            directory: Directory where indices and metadata will be stored
+
+        Returns:
+            None
+        """
         self.index_dir = directory
         os.makedirs(directory, exist_ok=True)
 
@@ -126,7 +194,15 @@ class CSWSearch:
 
     @classmethod
     def load(cls, directory: str):
-        """Load the metadata and index_files from disk"""
+        """
+        Load a previously saved search system from disk.
+
+        Args:
+            directory: Directory where indices and metadata are stored
+
+        Returns:
+            CSWSearch: The loaded search system
+        """
         csw_search = cls()
         csw_search.index_dir = directory
 
@@ -145,20 +221,40 @@ csw = CSWSearch()
 
 
 def add_params(model_list):
+    """
+    Index weight matrices from a list of HuggingFace model IDs.
 
-    # Add weight matrices from different models/layers
+    Loads each model, extracts its parameters, and adds all 2D weight matrices
+    to the CSWSearch index for later similarity search.
 
+    Args:
+        model_list: List of HuggingFace model IDs to index
+
+    Returns:
+        None: Updates the global csw search index
+    """
     for model_id in model_list:
         model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16)
         weights = model.state_dict()
         params = list(weights.keys())
         for param in params:
+            # Skip 1D tensors (like bias terms or layer norms)
             if len(weights[param].shape) == 1:
                 continue
             csw.add_weight_matrix(model_id, param_name=param, weight_matrix=weights[param])
 
 
 def get_similar_param(param, k=5):
+    """
+    Find similar parameters to the given weight matrix across indexed models.
+
+    Args:
+        param: Weight matrix tensor to search for
+        k: Number of similar matrices to return (default: 5)
+
+    Returns:
+        List of tuples containing (WeightInfo, similarity_score)
+    """
     return csw.find_similar_weights("--", param, k=k)
 
 

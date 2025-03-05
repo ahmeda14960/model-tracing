@@ -1,12 +1,43 @@
-# Returns permuted model. Takes in original model and fixed seed representing choice
-# of permutation for mlp layers and embedding layers.
+"""
+Module for permuting weights in a Llama model architecture.
+This enables exploring model connectivity and representation properties
+by applying consistent neuron permutations throughout the network.
+"""
+
+
 def permute_model(model, mlp_permutation, emb_permutation, n_blocks=32):
+    """
+    Apply permutations to a Llama model's weights to maintain functional equivalence.
+
+    Args:
+        model: The Llama model to permute
+        mlp_permutation: Permutation indices for MLP hidden dimensions
+        emb_permutation: Permutation indices for embedding dimensions
+        n_blocks: Number of transformer blocks in the model (default: 32)
+
+    Returns:
+        None: Modifies the model in-place
+    """
     permute_embedding_layer(model, emb_permutation)
     permute_transformer_blocks(model, mlp_permutation, emb_permutation)
     permute_output_layer(model, emb_permutation)
 
 
 def permute_transformer_blocks(model, mlp_permutation, emb_permutation):
+    """
+    Apply permutations to transformer block weights in a Llama model.
+
+    Permutes attention layers, MLP layers, and normalization layers according to
+    the provided permutation indices to maintain functional equivalence.
+
+    Args:
+        model: The Llama model to permute
+        mlp_permutation: Permutation indices for MLP hidden dimensions
+        emb_permutation: Permutation indices for embedding dimensions
+
+    Returns:
+        None: Modifies the model in-place
+    """
     weights = model.state_dict()
 
     # Permuting the Self attention layers
@@ -52,6 +83,16 @@ def permute_transformer_blocks(model, mlp_permutation, emb_permutation):
 
 
 def permute_embedding_layer(model, emb_permutation):
+    """
+    Apply permutation to embedding layer weights in a Llama model.
+
+    Args:
+        model: The Llama model to permute
+        emb_permutation: Permutation indices for embedding dimensions
+
+    Returns:
+        None: Modifies the model in-place
+    """
     weights = model.state_dict()
 
     weights["model.embed_tokens.weight"] = weights["model.embed_tokens.weight"][:, emb_permutation]
@@ -59,6 +100,18 @@ def permute_embedding_layer(model, emb_permutation):
 
 
 def permute_output_layer(model, emb_permutation):
+    """
+    Apply permutation to output layer weights in a Llama model.
+
+    Permutes the language model head and final normalization layer.
+
+    Args:
+        model: The Llama model to permute
+        emb_permutation: Permutation indices for embedding dimensions
+
+    Returns:
+        None: Modifies the model in-place
+    """
     weights = model.state_dict()
 
     weights["lm_head.weight"] = weights["lm_head.weight"][:, emb_permutation]

@@ -1,3 +1,10 @@
+"""
+Implementation of Cosine Similarity of Weights (CSW) test for comparing neural network models.
+
+This module provides functions to test whether two models have similar weight matrices
+using cosine similarity and statistical tests to quantify the similarity.
+"""
+
 import torch
 
 from tracing.utils.utils import cossim, fisher
@@ -9,11 +16,34 @@ from scipy.optimize import linear_sum_assignment as LAP
 
 
 def statistic(base_model, ft_model):
+    """
+    Compute Cosine Similarity of Weights statistic between two models.
+
+    Args:
+        base_model: Base model to compare
+        ft_model: Fine-tuned or target model to compare against the base model
+
+    Returns:
+        tuple: (aggregate_p_value, p_values_per_layer) from the CSW test
+    """
     return csw_sp(base_model, ft_model)
 
 
 def csw_sp_layer(base_model, ft_model, layer_name):
+    """
+    Calculate Cosine Similarity of Weights for a specific layer.
 
+    Uses linear assignment to find optimal matching between neurons in the layer
+    and calculates Spearman correlation to quantify similarity.
+
+    Args:
+        base_model: Base model to compare
+        ft_model: Fine-tuned or target model to compare against the base model
+        layer_name: Name of the layer in the model's state dict to analyze
+
+    Returns:
+        float: p-value indicating the statistical similarity of weight matrices
+    """
     base_mat = base_model.state_dict()[layer_name]
     ft_mat = ft_model.state_dict()[layer_name]
 
@@ -26,7 +56,19 @@ def csw_sp_layer(base_model, ft_model, layer_name):
 
 
 def csw_sp(model1, model2):
+    """
+    Apply CSW test across all MLP up-projection layers in the models.
 
+    Performs Fisher's method to combine p-values from individual layer tests
+    into an aggregate statistic.
+
+    Args:
+        model1: First model to compare
+        model2: Second model to compare
+
+    Returns:
+        tuple: (aggregate_p_value, list_of_p_values_per_layer)
+    """
     chi_squared = 0
     num_layers = 0
 
@@ -51,7 +93,20 @@ def csw_sp(model1, model2):
 
 
 def csw_sp_pair(base_model, ft_model, layer_name_base, layer_name_ft):
+    """
+    Calculate Cosine Similarity of Weights between two specific layers.
 
+    Similar to csw_sp_layer but allows comparing layers with different names.
+
+    Args:
+        base_model: Base model to compare
+        ft_model: Fine-tuned or target model to compare against the base model
+        layer_name_base: Name of the layer in the base model's state dict
+        layer_name_ft: Name of the layer in the fine-tuned model's state dict
+
+    Returns:
+        float: p-value indicating the statistical similarity of weight matrices
+    """
     base_mat = base_model.state_dict()[layer_name_base]
     ft_mat = ft_model.state_dict()[layer_name_ft]
 
@@ -64,6 +119,19 @@ def csw_sp_pair(base_model, ft_model, layer_name_base, layer_name_ft):
 
 
 def statistic_all(base_model, ft_model):
+    """
+    Compute comprehensive pairwise comparisons between all compatible layers.
+
+    Tests every possible layer pairing between models that have compatible shapes,
+    useful for exploring model structure similarities without assumptions.
+
+    Args:
+        base_model: Base model to compare
+        ft_model: Fine-tuned or target model to compare against the base model
+
+    Returns:
+        float: Aggregate p-value from Fisher's method combining all layer comparisons
+    """
     base_model.to("cpu")
     ft_model.to("cpu")
 
