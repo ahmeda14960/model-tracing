@@ -1,0 +1,31 @@
+---
+# base llama1
+- yahma/llama-7b-hf:
+    - lmsys/vicuna-7b-v1.1
+# base llama2
+- meta-llama/Llama-2-7b-hf:
+    - lmsys/vicuna-7b-v1.5
+    - codellama/CodeLlama-7b-hf:
+        # code llama family
+        - codellama/CodeLlama-7b-Python-hf
+        - codellama/CodeLlama-7b-Instruct-hf:
+            # code llama instruct fine tune
+            - AlfredPros/CodeLlama-7b-Instruct-Solidity
+        - EleutherAI/llemma_7b:
+            # llemma fine tune
+            - EleutherAI/llemma_7b_muinstruct_camelmath
+    - microsoft/Orca-2-7b
+    - oh-yeontaek/llama-2-7B-LoRA-assemble
+    - lvkaokao/llama2-7b-hf-instruction-lora
+    - NousResearch/Nous-Hermes-llama-2-7b
+
+# independent llama models
+- Salesforce/xgen-7b-4k-base
+- LLM360/Amber:
+    - LLM360/AmberChat
+# two open llama models trained independently
+- openlm-research/open_llama_7b
+- openlm-research/open_llama_7b_v2
+- ibm-granite/granite-7b-base:
+    # granite instruct variant
+    - ibm-granite/granite-7b-instruct

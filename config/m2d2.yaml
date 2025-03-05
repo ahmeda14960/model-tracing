@@ -1,0 +1,34 @@
+# Configuration for M2D2 datasets
+save_dir: "/nlp/scr/ahmedah/trace_results"
+m2d2_json_dir: "/juice4/scr4/nlp/model-tracing/m2d2_s2orc"
+datasets:
+  # These categories are derived from the ArXiv ontology
+  - "AI"  # Artificial Intelligence
+  - "CV"  # Computer Vision
+  - "ET"  # Emerging Technologies
+  - "IM"  # Information Management
+  - "mtrl-sci"  # Materials Science
+  - "stat-mech"  # Statistical Mechanics
+  - "AR"  # Architecture
+  - "CY"  # Cryptography and Security
+  - "IR"  # Information Retrieval
+  - "NA"  # Numerical Analysis
+  - "str-el"  # Strongly Correlated Electrons
+  # Additional ArXiv categories can be added here
+
+  # These categories are derived from the Wikipedia ontology
+  # - "HEAL"  # Health and Fitness
+  # - "HIST"  # History and Events
+  # - "SOCI"  # Society and Social Sciences
+  # - "TECH"  # Technology and Applied Sciences
+  # - "CULT"  # Culture and the Arts
+  # - "NATU"  # Natural and Physical Sciences
+  # - "HUMA"  # Human Activities
+  # - "MATH"  # Mathematics and Logic
+  # - "GENE"  # General Reference
+  # - "RELI"  # Religion and Belief Systems
+  # - "PHIL"  # Philosophy and Thinking
+
+model_architectures:
+  - "llama"
+  - "olmo"

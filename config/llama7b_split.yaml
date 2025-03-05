@@ -1,0 +1,24 @@
+---
+ft_models:
+   - lmsys/vicuna-7b-v1.5
+   - codellama/CodeLlama-7b-hf
+   - codellama/CodeLlama-7b-Python-hf
+   - codellama/CodeLlama-7b-Instruct-hf
+   - EleutherAI/llemma_7b
+   - microsoft/Orca-2-7b
+   - oh-yeontaek/llama-2-7B-LoRA-assemble
+   - lvkaokao/llama2-7b-hf-instruction-lora
+   - NousResearch/Nous-Hermes-llama-2-7b
+   - lmsys/vicuna-7b-v1.1
+   - EleutherAI/llemma_7b_muinstruct_camelmath
+   - AlfredPros/CodeLlama-7b-Instruct-Solidity
+   - LLM360/AmberChat
+   - ibm-granite/granite-7b-instruct
+base_models:
+   - meta-llama/Llama-2-7b-hf
+   - yahma/llama-7b-hf
+   - Salesforce/xgen-7b-4k-base
+   - LLM360/Amber
+   - openlm-research/open_llama_7b
+   - openlm-research/open_llama_7b_v2
+   - ibm-granite/granite-7b-base

@@ -1,0 +1,9 @@
+# Configuration for Dolma Programming Languages
+save_dir: "/nlp/scr/ahmedah/trace_results"
+dolma_json_dir: "/juice4/scr4/nlp/model-tracing/dolma_program_languages/json_files"
+datasets:
+  - "cpp"
+  - "python"
+  - "js"
+model_architectures:
+  - "llama"
