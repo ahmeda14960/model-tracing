@@ -11,7 +11,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 
 from tracing.utils.evaluate import evaluate
 from tracing.utils.evaluate import prepare_hf_dataset, prepare_hf_dataloader
-from tracing.statistics.mlp_sp import hook_out
+from tracing.statistics.match import hook_out
 from tracing.utils.evaluate import (
     prepare_hf_dataset,
     prepare_hf_dataloader,
